@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Define a default value so it's not empty if the builder fails to provide it
-ARG BUILDPLATFORM=linux/amd64
+ARG TARGETPLATFORM
 
-FROM --platform=$BUILDPLATFORM node:20.20.1-alpine@sha256:b88333c42c23fbd91596ebd7fd10de239cedab9617de04142dde7315e3bc0afa AS builder
+FROM --platform=$TARGETPLATFORM node:20.20.1-alpine@sha256:b88333c42c23fbd91596ebd7fd10de239cedab9617de04142dde7315e3bc0afa AS builder
 
 # Some packages (e.g. @google-cloud/profiler) require additional
 # deps for post-install scripts
@@ -27,19 +26,16 @@ RUN apk add --update --no-cache \
 WORKDIR /usr/src/app
 
 COPY package*.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 
-RUN npm install --only=production
-
-FROM alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+FROM --platform=$TARGETPLATFORM alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
 
 RUN apk add --no-cache nodejs
 
 WORKDIR /usr/src/app
 
 COPY --from=builder /usr/src/app/node_modules ./node_modules
-
 COPY . .
 
 EXPOSE 7000
-
-ENTRYPOINT [ "node", "server.js" ]
+ENTRYPOINT ["node", "server.js"]

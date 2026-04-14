@@ -12,44 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Define a default value so it's not empty if the builder fails to provide it
-ARG BUILDPLATFORM=linux/amd64
+ARG TARGETPLATFORM
 
-FROM --platform=$BUILDPLATFORM python:3.14.3-alpine@sha256:faee120f7885a06fcc9677922331391fa690d911c020abb9e8025ff3d908e510 AS base
-
-FROM base AS builder
-
+FROM --platform=$TARGETPLATFORM python:3.14.3-alpine@sha256:faee120f7885a06fcc9677922331391fa690d911c020abb9e8025ff3d908e510 AS builder
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-
 RUN apk update \
-    && apk add --no-cache g++ linux-headers \
+    && apk add --no-cache g++ linux-headers musl-dev \
     && rm -rf /var/cache/apk/*
-
-# get packages
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --prefix=/install -r requirements.txt
 
-FROM base
-
+FROM --platform=$TARGETPLATFORM python:3.14.3-alpine@sha256:faee120f7885a06fcc9677922331391fa690d911c020abb9e8025ff3d908e510
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-
 RUN apk update \
     && apk add --no-cache libstdc++ \
     && rm -rf /var/cache/apk/*
-
-# get packages
 WORKDIR /recommendationservice
-
-# Grab packages from builder
-COPY --from=builder /usr/local/lib/python3.14/ /usr/local/lib/python3.14/
-
-# Add the application
+COPY --from=builder /install /usr/local
 COPY . .
-
-# set listen port
 ENV PORT="8080"
 EXPOSE 8080
-
 ENTRYPOINT ["python", "recommendation_server.py"]
+
